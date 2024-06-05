@@ -1,0 +1,198 @@
+@inject AppService AppService
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+@inject HttpClient HttpClient
+
+@if (record == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <style>
+        .rz-fileupload-content {
+            display: none;
+        }
+    </style>
+    <RadzenColumn SizeMD=12>
+        <RadzenTemplateForm TItem="Address" Data="@record" Submit="OnSubmit">
+            <RadzenStack>
+                <RadzenFormField Text="Id" Variant="Variant.Filled">
+                    <ChildContent>
+                        <RadzenNumeric style="display:block;width:100%;" TValue="long?" Name="Id" @bind-Value="@record.Id" Disabled="true" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenFormField Text="Street" Variant="Variant.Filled">
+                    <ChildContent>
+                        <RadzenTextBox style="display:block;width:100%;" Name="Street" @bind-Value="@record.Street" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenFormField Text="City" Variant="Variant.Filled">
+                    <ChildContent>
+                        <RadzenTextBox style="display:block;width:100%;" Name="City" @bind-Value="@record.City" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenFormField Text="State" Variant="Variant.Filled">
+                    <ChildContent>
+                        <RadzenTextBox style="display:block;width:100%;" Name="State" @bind-Value="@record.State" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenFormField Text="ZipCode" Variant="Variant.Filled">
+                    <ChildContent>
+                        <RadzenNumeric style="display:block;width:100%;" TValue="long?" Name="ZipCode" @bind-Value="@record.ZipCode" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenFormField Text="Country" Variant="Variant.Filled">
+                    <ChildContent>
+                        <RadzenTextBox style="display:block;width:100%;" Name="Country" @bind-Value="@record.Country" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenFileInput TValue="string" Accept=".png,.jpg,.jpeg" MaxWidth="256" MaxHeight="256" Change="@(async args => record.Photo = await UploadImageAsync(args))" ChooseText="Upload Photo" />
+                @if (!string.IsNullOrEmpty(record.Photo))
+                {
+                    <RadzenImage Path="@GetAbsoluteUri(record.Photo)" Style="width:128px;height:128px;object-fit:contain;" />
+                }
+                <RadzenFormField Text="Notes" Variant="Variant.Filled">
+                    <ChildContent>
+                        <RadzenTextBox style="display:block;width:100%;" Name="Notes" @bind-Value="@record.Notes" />
+                    </ChildContent>
+                </RadzenFormField>
+            </RadzenStack>
+            <RadzenStack style="margin-top:1rem;" Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.End" Gap="0.5rem">
+                <RadzenButton ButtonStyle="ButtonStyle.Primary" ButtonType="ButtonType.Submit" Icon="save" Text="Save" Variant="Variant.Flat" />
+                <RadzenButton ButtonStyle="ButtonStyle.Light" Text="Cancel" Variant="Variant.Flat" Click="Cancel" />
+            </RadzenStack>
+        </RadzenTemplateForm>
+    </RadzenColumn>
+}
+
+@code {
+    [Parameter]
+    public long Id { get; set; }
+
+    private Address? record;
+
+    private string GetAbsoluteUri(string uri)
+    {
+        if (!uri.StartsWith("/"))
+        {
+            return uri;
+        }
+
+        var baseUri = HttpClient.BaseAddress;
+
+        if (baseUri == null)
+        {
+            throw new Exception("Unable to determine base address");
+        }
+
+        Uri absolute = new(baseUri, uri);
+
+        return absolute.ToString();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            record = await AppService.GetAddressByIdAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            NotificationMessage message = new()
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Load Failed",
+                Detail = ex.Message,
+                Duration = 4000
+            };
+
+            NotificationService.Notify(message);
+        }
+    }
+
+    private void Cancel()
+    {
+        DialogService.Close();
+    }
+
+    private async Task OnSubmit()
+    {
+        if (record == null)
+        {
+            return;
+        }
+
+        try
+        {
+            await AppService.UpdateAddressAsync(Id, record);
+            DialogService.Close();
+        }
+        catch (Exception ex)
+        {
+            NotificationMessage message = new()
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Update Failed",
+                Detail = ex.Message,
+                Duration = 4000
+            };
+
+            NotificationService.Notify(message);
+        }
+    }
+
+    private async Task<string?> UploadImageAsync(string dataUri)
+    {
+        const string jpegPrefix = "data:image/jpeg;base64,";
+        const string pngPrefix = "data:image/png;base64,";
+
+        string contentType;
+        byte[] buffer;
+
+        if (dataUri.StartsWith(jpegPrefix))
+        {
+            contentType = "image/jpeg";
+            buffer = Convert.FromBase64String(dataUri.Substring(jpegPrefix.Length));
+        }
+        else if (dataUri.StartsWith(pngPrefix))
+        {
+            contentType = "image/png";
+            buffer = Convert.FromBase64String(dataUri.Substring(pngPrefix.Length));
+        }
+        else
+        {
+            NotificationMessage message = new()
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Unsupported Image Type",
+                Detail = "Only JPEG and PNG images can be uploaded.",
+                Duration = 4000
+            };
+
+            NotificationService.Notify(message);
+            return null;
+        }
+
+        using MemoryStream stream = new(buffer);
+
+        try
+        {
+            return await AppService.UploadImageAsync(stream, buffer.Length, contentType);
+        }
+        catch (Exception ex)
+        {
+            NotificationMessage message = new()
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Image Upload Failed",
+                Detail = ex.Message,
+                Duration = 4000
+            };
+
+            NotificationService.Notify(message);
+        }
+
+        return null;
+    }
+}

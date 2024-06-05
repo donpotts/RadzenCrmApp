@@ -1,0 +1,18 @@
+@page "/logout"
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Navigation
+
+<PageTitle>Logout</PageTitle>
+
+<RadzenText TextStyle="TextStyle.H2" TagName="TagName.H1">Logout</RadzenText>
+
+<p><em>Logging out...</em></p>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        await ((IdentityAuthenticationStateProvider)AuthenticationStateProvider).LogoutAsync();
+
+        Navigation.NavigateTo("");
+    }
+}

@@ -1,0 +1,121 @@
+@page "/register"
+@inject AppService AppService
+@inject NavigationManager Navigation
+@inject NotificationService NotificationService
+
+<PageTitle>Register</PageTitle>
+
+<RadzenText TextStyle="TextStyle.H2" TagName="TagName.H1">Register</RadzenText>
+
+<RadzenCard Class="rz-my-12 rz-mx-auto" Style="max-width: 600px">
+    <div class="rz-login">
+        <RadzenTemplateForm TItem="RegisterModel" Data=@registerModel Submit=@OnSubmit>
+            <div class="rz-form-row">
+                <RadzenLabel Text="Email" Component="Email" />
+                <div class="rz-form-input-wrapper">
+                    <RadzenTextBox id="Email" Name="Email" @bind-Value=@registerModel.Email />
+                    <RadzenRequiredValidator Component="Email" Text="Email is required" />
+                    <RadzenEmailValidator Component="Email" Text="Provide a valid email address" />
+                </div>
+            </div>
+            <div class="rz-form-row">
+                <RadzenLabel Text="Password" Component="Password" />
+                <div class="rz-form-input-wrapper">
+                    <RadzenPassword id="Password" Name="Password" @bind-Value=@registerModel.Password />
+                    <RadzenRequiredValidator Component="Password" Text="Password is required" />
+                </div>
+            </div>
+            <div class="rz-form-row">
+                <RadzenLabel Text="Confirm Password" Component="ConfirmPassword" />
+                <div class="rz-form-input-wrapper">
+                    <RadzenPassword id="ConfirmPassword" Name="ConfirmPassword" @bind-Value=@registerModel.ConfirmPassword />
+                    <RadzenRequiredValidator Component="ConfirmPassword" Text="Confirm Password is required" />
+                </div>
+            </div>
+            <div class="rz-form-row">
+                <RadzenLabel Text="First Name" Component="FirstName" />
+                <div class="rz-form-input-wrapper">
+                    <RadzenTextBox id="FirstName" Name="FirstName" @bind-Value=@registerModel.FirstName />
+                    <RadzenRequiredValidator Component="FirstName" Text="First Name is required" />
+                </div>
+            </div>
+            <div class="rz-form-row">
+                <RadzenLabel Text="Last Name" Component="LastName" />
+                <div class="rz-form-input-wrapper">
+                    <RadzenTextBox id="LastName" Name="LastName" @bind-Value=@registerModel.LastName />
+                    <RadzenRequiredValidator Component="LastName" Text="Last Name is required" />
+                </div>
+            </div>
+            <div class="rz-form-row">
+                <RadzenLabel Text="Title" Component="Title" />
+                <div class="rz-form-input-wrapper">
+                    <RadzenTextBox id="Title" Name="Title" @bind-Value=@registerModel.Title />
+                </div>
+            </div>
+            <div class="rz-form-row">
+                <RadzenLabel Text="Company Name" Component="CompanyName" />
+                <div class="rz-form-input-wrapper">
+                    <RadzenTextBox id="CompanyName" Name="CompanyName" @bind-Value=@registerModel.CompanyName />
+                </div>
+            </div>
+            <div class="rz-form-row">
+                <RadzenLabel Text="" />
+                <div class="rz-form-input-wrapper rz-login-buttons">
+                    <RadzenButton ButtonStyle="ButtonStyle.Primary" ButtonType="ButtonType.Submit" Text="Register" />
+                </div>
+            </div>
+        </RadzenTemplateForm>
+        <div class="rz-register">
+            Already have an account?
+            <RadzenButton ButtonType="ButtonType.Button" Variant="Variant.Flat" ButtonStyle="ButtonStyle.Secondary" Shade="Shade.Lighter" Text="Login" Click=@OnLogin />
+        </div>
+    </div>
+</RadzenCard>
+
+@code {
+    private RegisterModel registerModel = new();
+
+    private async Task OnSubmit()
+    {
+        try
+        {
+            var errors = await AppService.RegisterUserAsync(registerModel);
+
+            if (errors.Any())
+            {
+                NotificationMessage errorMessage = new()
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Registration Failed<br>",
+                    Detail = string.Join("<br>", errors.Values.SelectMany(x => x)),
+                    Duration = 4000,
+                };
+
+                NotificationService.Notify(errorMessage);
+
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationMessage message = new()
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Registration Failed",
+                Detail = ex.Message,
+                Duration = 4000,
+            };
+
+            NotificationService.Notify(message);
+
+            return;
+        }
+
+        Navigation.NavigateTo("login");
+    }
+
+    private void OnLogin()
+    {
+        Navigation.NavigateTo("login");
+    }
+}

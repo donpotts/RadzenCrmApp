@@ -1,0 +1,210 @@
+@inject AppService AppService
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+@inject HttpClient HttpClient
+@attribute [Authorize(Roles = "Administrator")]
+
+<style>
+    .rz-fileupload-content {
+        display: none;
+    }
+</style>
+<RadzenColumn SizeMD=12>
+    <RadzenTemplateForm TItem="RegisterModel" Data="@registerModel" Submit="OnSubmit">
+        <RadzenStack>
+            <RadzenFormField Text="Email" Variant="Variant.Filled">
+                <ChildContent>
+                    <RadzenTextBox style="display:block;width:100%;" Name="Email" @bind-Value="@registerModel.Email" />
+                </ChildContent>
+                <Helper>
+                    <RadzenRequiredValidator Component="Email" Text="Email is required" />
+                    <RadzenEmailValidator Component="Email" Text="Provide a valid email address" />
+                </Helper>
+            </RadzenFormField>
+            <RadzenFormField Text="Password" Variant="Variant.Filled">
+                <ChildContent>
+                    <RadzenPassword style="display:block;width:100%;" Name="Password" @bind-Value="@registerModel.Password" />
+                </ChildContent>
+                <Helper>
+                    <RadzenRequiredValidator Component="Password" Text="Password is required" />
+                </Helper>
+            </RadzenFormField>
+            <RadzenFormField Text="Confirm Password" Variant="Variant.Filled">
+                <ChildContent>
+                    <RadzenPassword style="display:block;width:100%;" Name="ConfirmPassword" @bind-Value="@registerModel.ConfirmPassword" />
+                </ChildContent>
+                <Helper>
+                    <RadzenRequiredValidator Component="ConfirmPassword" Text="Confirm Password is required" />
+                </Helper>
+            </RadzenFormField>
+            <RadzenFormField Text="First Name" Variant="Variant.Filled">
+                <ChildContent>
+                    <RadzenTextBox style="display:block;width:100%;" Name="FirstName" @bind-Value="@registerModel.FirstName" />
+                </ChildContent>
+                <Helper>
+                    <RadzenRequiredValidator Component="FirstName" Text="First Name is required" />
+                </Helper>
+            </RadzenFormField>
+            <RadzenFormField Text="Last Name" Variant="Variant.Filled">
+                <ChildContent>
+                    <RadzenTextBox style="display:block;width:100%;" Name="LastName" @bind-Value="@registerModel.LastName" />
+                </ChildContent>
+                <Helper>
+                    <RadzenRequiredValidator Component="LastName" Text="Last Name is required" />
+                </Helper>
+            </RadzenFormField>
+            <RadzenFormField Text="Title" Variant="Variant.Filled">
+                <ChildContent>
+                    <RadzenTextBox style="display:block;width:100%;" Name="Title" @bind-Value="@registerModel.Title" />
+                </ChildContent>
+            </RadzenFormField>
+            <RadzenFormField Text="Company Name" Variant="Variant.Filled">
+                <ChildContent>
+                    <RadzenTextBox style="display:block;width:100%;" Name="CompanyName" @bind-Value="@registerModel.CompanyName" />
+                </ChildContent>
+            </RadzenFormField>
+            <RadzenFileInput TValue="string" Accept=".png,.jpg,.jpeg" MaxWidth="256" MaxHeight="256" Change="@(async args => registerModel.Photo = await UploadImageAsync(args))" ChooseText="Upload Photo" />
+            @if (!string.IsNullOrEmpty(registerModel.Photo))
+            {
+                <RadzenImage Path="@GetAbsoluteUri(registerModel.Photo)" Style="width:128px;height:128px;object-fit:contain;" />
+            }
+        </RadzenStack>
+        <RadzenStack style="margin-top:1rem;" Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.End" Gap="0.5rem">
+            <RadzenButton ButtonStyle="ButtonStyle.Primary" ButtonType="ButtonType.Submit" Icon="save" Text="Save" Variant="Variant.Flat" />
+            <RadzenButton ButtonStyle="ButtonStyle.Light" Text="Cancel" Variant="Variant.Flat" Click="Cancel" />
+        </RadzenStack>
+    </RadzenTemplateForm>
+</RadzenColumn>
+
+@code {
+    private RegisterModel registerModel = new();
+
+    private string GetAbsoluteUri(string uri)
+    {
+        if (!uri.StartsWith("/"))
+        {
+            return uri;
+        }
+
+        var baseUri = HttpClient.BaseAddress;
+
+        if (baseUri == null)
+        {
+            throw new Exception("Unable to determine base address");
+        }
+
+        Uri absolute = new(baseUri, uri);
+
+        return absolute.ToString();
+    }
+
+    private void Cancel()
+    {
+        DialogService.Close();
+    }
+
+    private async Task OnSubmit()
+    {
+        if (registerModel.Password != registerModel.ConfirmPassword)
+        {
+            NotificationMessage message = new()
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Add Failed",
+                Detail = "Password and Confirm Password do not match.",
+                Duration = 4000
+            };
+
+            NotificationService.Notify(message);
+            return;
+        }
+
+        try
+        {
+            var errors = await AppService.RegisterUserAsync(registerModel);
+
+            if (errors.Any())
+            {
+                NotificationMessage errorMessage = new()
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Add Failed<br>",
+                    Detail = string.Join("<br>", errors.Values.SelectMany(x => x)),
+                    Duration = 4000,
+                };
+
+                NotificationService.Notify(errorMessage);
+
+                return;
+            }
+
+            DialogService.Close();
+        }
+        catch (Exception ex)
+        {
+            NotificationMessage message = new()
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Add Failed",
+                Detail = ex.Message,
+                Duration = 4000,
+            };
+
+            NotificationService.Notify(message);
+        }
+    }
+
+    private async Task<string?> UploadImageAsync(string dataUri)
+    {
+        const string jpegPrefix = "data:image/jpeg;base64,";
+        const string pngPrefix = "data:image/png;base64,";
+
+        string contentType;
+        byte[] buffer;
+
+        if (dataUri.StartsWith(jpegPrefix))
+        {
+            contentType = "image/jpeg";
+            buffer = Convert.FromBase64String(dataUri.Substring(jpegPrefix.Length));
+        }
+        else if (dataUri.StartsWith(pngPrefix))
+        {
+            contentType = "image/png";
+            buffer = Convert.FromBase64String(dataUri.Substring(pngPrefix.Length));
+        }
+        else
+        {
+            NotificationMessage message = new()
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Unsupported Image Type",
+                Detail = "Only JPEG and PNG images can be uploaded.",
+                Duration = 4000
+            };
+
+            NotificationService.Notify(message);
+            return null;
+        }
+
+        using MemoryStream stream = new(buffer);
+
+        try
+        {
+            return await AppService.UploadImageAsync(stream, buffer.Length, contentType);
+        }
+        catch (Exception ex)
+        {
+            NotificationMessage message = new()
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Image Upload Failed",
+                Detail = ex.Message,
+                Duration = 4000
+            };
+
+            NotificationService.Notify(message);
+        }
+
+        return null;
+    }
+}

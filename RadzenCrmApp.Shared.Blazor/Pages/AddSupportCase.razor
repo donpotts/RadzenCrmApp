@@ -1,0 +1,199 @@
+@inject AppService AppService
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+@inject HttpClient HttpClient
+
+<style>
+    .rz-fileupload-content {
+        display: none;
+    }
+</style>
+<RadzenColumn SizeMD=12>
+    <RadzenTemplateForm TItem="SupportCase" Data="@record" Submit="OnSubmit">
+        <RadzenStack>
+            <RadzenFormField Text="CustomerId" Variant="Variant.Filled">
+                <ChildContent>
+                    <RadzenNumeric style="display:block;width:100%;" TValue="long?" Name="CustomerId" @bind-Value="@record.CustomerId" />
+                </ChildContent>
+            </RadzenFormField>
+            <RadzenFormField Text="ProductId" Variant="Variant.Filled">
+                <ChildContent>
+                    <RadzenNumeric style="display:block;width:100%;" TValue="long?" Name="ProductId" @bind-Value="@record.ProductId" />
+                </ChildContent>
+            </RadzenFormField>
+            <RadzenFormField Text="ServiceId" Variant="Variant.Filled">
+                <ChildContent>
+                    <RadzenTextBox style="display:block;width:100%;" Name="ServiceId" @bind-Value="@record.ServiceId" />
+                </ChildContent>
+            </RadzenFormField>
+            <RadzenFormField Text="Status" Variant="Variant.Filled">
+                <ChildContent>
+                    <RadzenTextBox style="display:block;width:100%;" Name="Status" @bind-Value="@record.Status" />
+                </ChildContent>
+            </RadzenFormField>
+            <RadzenFormField Text="Description" Variant="Variant.Filled">
+                <ChildContent>
+                    <RadzenTextBox style="display:block;width:100%;" Name="Description" @bind-Value="@record.Description" />
+                </ChildContent>
+            </RadzenFormField>
+            <RadzenFormField Text="CreatedDateTime" Variant="Variant.Filled">
+                <ChildContent>
+                    <RadzenDatePicker ShowTime="true" ShowSeconds="true" style="display:block;width:100%;" TValue="DateTime?" Name="CreatedDateTime" @bind-Value="@record.CreatedDateTime" />
+                </ChildContent>
+            </RadzenFormField>
+            <RadzenFormField Text="ModifiedDateTime" Variant="Variant.Filled">
+                <ChildContent>
+                    <RadzenDatePicker ShowTime="true" ShowSeconds="true" style="display:block;width:100%;" TValue="DateTime?" Name="ModifiedDateTime" @bind-Value="@record.ModifiedDateTime" />
+                </ChildContent>
+            </RadzenFormField>
+            <RadzenFormField Text="UserId" Variant="Variant.Filled">
+                <ChildContent>
+                    <RadzenNumeric style="display:block;width:100%;" TValue="long?" Name="UserId" @bind-Value="@record.UserId" />
+                </ChildContent>
+            </RadzenFormField>
+            <RadzenFormField Text="FollowupDate" Variant="Variant.Filled">
+                <ChildContent>
+                    <RadzenTextBox style="display:block;width:100%;" Name="FollowupDate" @bind-Value="@record.FollowupDate" />
+                </ChildContent>
+            </RadzenFormField>
+            <RadzenFileInput TValue="string" Accept=".png,.jpg,.jpeg" MaxWidth="256" MaxHeight="256" Change="@(async args => record.Icon = await UploadImageAsync(args))" ChooseText="Upload Icon" />
+            @if (!string.IsNullOrEmpty(record.Icon))
+            {
+                <RadzenImage Path="@GetAbsoluteUri(record.Icon)" Style="width:128px;height:128px;object-fit:contain;" />
+            }
+            <RadzenFormField Text="Notes" Variant="Variant.Filled">
+                <ChildContent>
+                    <RadzenTextBox style="display:block;width:100%;" Name="Notes" @bind-Value="@record.Notes" />
+                </ChildContent>
+            </RadzenFormField>
+        </RadzenStack>
+        <RadzenStack style="margin-top:1rem;" Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.End" Gap="0.5rem">
+            <RadzenButton ButtonStyle="ButtonStyle.Primary" ButtonType="ButtonType.Submit" Icon="save" Text="Save" Variant="Variant.Flat" />
+            <RadzenButton ButtonStyle="ButtonStyle.Light" Text="Cancel" Variant="Variant.Flat" Click="Cancel" />
+        </RadzenStack>
+    </RadzenTemplateForm>
+</RadzenColumn>
+
+@code {
+    private SupportCase record = new();
+
+    private string GetAbsoluteUri(string uri)
+    {
+        if (!uri.StartsWith("/"))
+        {
+            return uri;
+        }
+
+        var baseUri = HttpClient.BaseAddress;
+
+        if (baseUri == null)
+        {
+            throw new Exception("Unable to determine base address");
+        }
+
+        Uri absolute = new(baseUri, uri);
+
+        return absolute.ToString();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+
+        try
+        {
+        }
+        catch (Exception ex)
+        {
+            NotificationMessage message = new()
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Add Failed",
+                Detail = ex.Message,
+                Duration = 4000
+            };
+
+            NotificationService.Notify(message);
+        }
+    }
+
+    private void Cancel()
+    {
+        DialogService.Close();
+    }
+
+    private async Task OnSubmit()
+    {
+        try
+        {
+            await AppService.InsertSupportCaseAsync(record);
+            DialogService.Close();
+        }
+        catch (Exception ex)
+        {
+            NotificationMessage message = new()
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Add Failed",
+                Detail = ex.Message,
+                Duration = 4000
+            };
+
+            NotificationService.Notify(message);
+        }
+    }
+
+    private async Task<string?> UploadImageAsync(string dataUri)
+    {
+        const string jpegPrefix = "data:image/jpeg;base64,";
+        const string pngPrefix = "data:image/png;base64,";
+
+        string contentType;
+        byte[] buffer;
+
+        if (dataUri.StartsWith(jpegPrefix))
+        {
+            contentType = "image/jpeg";
+            buffer = Convert.FromBase64String(dataUri.Substring(jpegPrefix.Length));
+        }
+        else if (dataUri.StartsWith(pngPrefix))
+        {
+            contentType = "image/png";
+            buffer = Convert.FromBase64String(dataUri.Substring(pngPrefix.Length));
+        }
+        else
+        {
+            NotificationMessage message = new()
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Unsupported Image Type",
+                Detail = "Only JPEG and PNG images can be uploaded.",
+                Duration = 4000
+            };
+
+            NotificationService.Notify(message);
+            return null;
+        }
+
+        using MemoryStream stream = new(buffer);
+
+        try
+        {
+            return await AppService.UploadImageAsync(stream, buffer.Length, contentType);
+        }
+        catch (Exception ex)
+        {
+            NotificationMessage message = new()
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Image Upload Failed",
+                Detail = ex.Message,
+                Duration = 4000
+            };
+
+            NotificationService.Notify(message);
+        }
+
+        return null;
+    }
+}

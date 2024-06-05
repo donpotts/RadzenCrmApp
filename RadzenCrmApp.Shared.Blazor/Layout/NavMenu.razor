@@ -1,0 +1,60 @@
+@using System.Security.Claims
+@inject AppService AppService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<RadzenHeader>
+    <RadzenRow AlignItems="AlignItems.Center" JustifyContent="JustifyContent.Start" Gap="0">
+        <RadzenColumn Size="5">
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center">
+                <RadzenSidebarToggle Click="@(() => sidebarExpanded = !sidebarExpanded)" />
+                <RadzenLabel Text="CRM Sample" style="overflow: hidden; white-space: nowrap; text-overflow: ellipsis;" />
+            </RadzenStack>
+        </RadzenColumn>
+        <RadzenColumn Size="7">
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.End">
+                <div Class="rz-display-none rz-display-sm-inline-flex align-items-center">
+                    <a href="https://www.radendpoint.com/" Class="rz-mx-2 rz-mx-lg-4" target="_blank">About</a>
+                </div>
+            </RadzenStack>
+        </RadzenColumn>
+    </RadzenRow>
+</RadzenHeader>
+<RadzenSidebar @bind-Expanded="@sidebarExpanded">
+    <RadzenPanelMenu>
+        <RadzenPanelMenuItem Text="Home" Icon="home" Path="/" />
+        <AuthorizeView>
+            <RadzenPanelMenuItem Text="Customer" Icon="table_chart" Path="customer" />
+            <RadzenPanelMenuItem Text="Address" Icon="table_chart" Path="address" />
+            <RadzenPanelMenuItem Text="Product Category" Icon="table_chart" Path="productcategory" />
+            <RadzenPanelMenuItem Text="Service Category" Icon="table_chart" Path="servicecategory" />
+            <RadzenPanelMenuItem Text="Contact" Icon="table_chart" Path="contact" />
+            <RadzenPanelMenuItem Text="Opportunity" Icon="table_chart" Path="opportunity" />
+            <RadzenPanelMenuItem Text="Lead" Icon="table_chart" Path="lead" />
+            <RadzenPanelMenuItem Text="Product" Icon="table_chart" Path="product" />
+            <RadzenPanelMenuItem Text="Service" Icon="table_chart" Path="service" />
+            <RadzenPanelMenuItem Text="Sale" Icon="table_chart" Path="sale" />
+            <RadzenPanelMenuItem Text="Vendor" Icon="table_chart" Path="vendor" />
+            <RadzenPanelMenuItem Text="Support Case" Icon="table_chart" Path="supportcase" />
+            <RadzenPanelMenuItem Text="Todo Task" Icon="table_chart" Path="todotask" />
+            <RadzenPanelMenuItem Text="Contact Rewards" Icon="table_chart" Path="reward" />
+
+        </AuthorizeView>
+        <AuthorizeView Roles="Administrator">
+            <RadzenPanelMenuItem Text="User" Icon="people" Path="user" />
+        </AuthorizeView>
+        <AuthorizeView>
+            <Authorized>
+                <RadzenPanelMenuItem Text="Change Password" Icon="edit" Path="account/changePassword" />
+                <RadzenPanelMenuItem Text=@($"Logout ({context.User.Identity!.Name})") Icon="logout" Path="logout" />
+            </Authorized>
+            <NotAuthorized>
+                <RadzenPanelMenuItem Text="Register" Icon="edit" Path="register" />
+                <RadzenPanelMenuItem Text="Login" Icon="login" Path="login" />
+            </NotAuthorized>
+        </AuthorizeView>
+    </RadzenPanelMenu>
+</RadzenSidebar>
+
+@code {
+    bool sidebarExpanded = true;
+}

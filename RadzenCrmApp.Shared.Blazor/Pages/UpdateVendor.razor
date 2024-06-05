@@ -1,0 +1,214 @@
+@inject AppService AppService
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+@inject HttpClient HttpClient
+
+@if (record == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <style>
+        .rz-fileupload-content {
+            display: none;
+        }
+    </style>
+    <RadzenColumn SizeMD=12>
+        <RadzenTemplateForm TItem="Vendor" Data="@record" Submit="OnSubmit">
+            <RadzenStack>
+                <RadzenFormField Text="Id" Variant="Variant.Filled">
+                    <ChildContent>
+                        <RadzenNumeric style="display:block;width:100%;" TValue="long?" Name="Id" @bind-Value="@record.Id" Disabled="true" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenFormField Text="Name" Variant="Variant.Filled">
+                    <ChildContent>
+                        <RadzenTextBox style="display:block;width:100%;" Name="Name" @bind-Value="@record.Name" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenFormField Text="ContactName" Variant="Variant.Filled">
+                    <ChildContent>
+                        <RadzenTextBox style="display:block;width:100%;" Name="ContactName" @bind-Value="@record.ContactName" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenFormField Text="Phone" Variant="Variant.Filled">
+                    <ChildContent>
+                        <RadzenNumeric style="display:block;width:100%;" TValue="long?" Name="Phone" @bind-Value="@record.Phone" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenFormField Text="Email" Variant="Variant.Filled">
+                    <ChildContent>
+                        <RadzenTextBox style="display:block;width:100%;" Name="Email" @bind-Value="@record.Email" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenFileInput TValue="string" Accept=".png,.jpg,.jpeg" MaxWidth="256" MaxHeight="256" Change="@(async args => record.Logo = await UploadImageAsync(args))" ChooseText="Upload Logo" />
+                @if (!string.IsNullOrEmpty(record.Logo))
+                {
+                    <RadzenImage Path="@GetAbsoluteUri(record.Logo)" Style="width:128px;height:128px;object-fit:contain;" />
+                }
+                <RadzenFormField Text="Notes" Variant="Variant.Filled">
+                    <ChildContent>
+                        <RadzenTextBox style="display:block;width:100%;" Name="Notes" @bind-Value="@record.Notes" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenFormField Text="Address" Variant="Variant.Filled">
+                    <RadzenDropDown @bind-Value="record.AddressId" Data="@addressEnumerable" TextProperty="City" ValueProperty="Id" AllowClear="true" />
+                </RadzenFormField>
+                <RadzenFormField Text="Product" Variant="Variant.Filled">
+                    <RadzenDropDown @bind-Value="productValues" Data="@productEnumerable" TextProperty="Name" ValueProperty="Id" Multiple="true" AllowClear="true" />
+                </RadzenFormField>
+                <RadzenFormField Text="Service" Variant="Variant.Filled">
+                    <RadzenDropDown @bind-Value="serviceValues" Data="@serviceEnumerable" TextProperty="Name" ValueProperty="Id" Multiple="true" AllowClear="true" />
+                </RadzenFormField>
+            </RadzenStack>
+            <RadzenStack style="margin-top:1rem;" Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.End" Gap="0.5rem">
+                <RadzenButton ButtonStyle="ButtonStyle.Primary" ButtonType="ButtonType.Submit" Icon="save" Text="Save" Variant="Variant.Flat" />
+                <RadzenButton ButtonStyle="ButtonStyle.Light" Text="Cancel" Variant="Variant.Flat" Click="Cancel" />
+            </RadzenStack>
+        </RadzenTemplateForm>
+    </RadzenColumn>
+}
+
+@code {
+    [Parameter]
+    public long Id { get; set; }
+
+    private IEnumerable<Address>? addressEnumerable;
+    private IEnumerable<Product>? productEnumerable;
+    private IEnumerable<long?>? productValues;
+    private IEnumerable<Service>? serviceEnumerable;
+    private IEnumerable<long?>? serviceValues;
+    private Vendor? record;
+
+    private string GetAbsoluteUri(string uri)
+    {
+        if (!uri.StartsWith("/"))
+        {
+            return uri;
+        }
+
+        var baseUri = HttpClient.BaseAddress;
+
+        if (baseUri == null)
+        {
+            throw new Exception("Unable to determine base address");
+        }
+
+        Uri absolute = new(baseUri, uri);
+
+        return absolute.ToString();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            addressEnumerable = (await AppService.ListAddressAsync()).Value;
+            productEnumerable = (await AppService.ListProductAsync()).Value;
+            serviceEnumerable = (await AppService.ListServiceAsync()).Value;
+            record = await AppService.GetVendorByIdAsync(Id);
+            productValues = record?.Product?.Select(x => x.Id) ?? [];
+            serviceValues = record?.Service?.Select(x => x.Id) ?? [];
+        }
+        catch (Exception ex)
+        {
+            NotificationMessage message = new()
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Load Failed",
+                Detail = ex.Message,
+                Duration = 4000
+            };
+
+            NotificationService.Notify(message);
+        }
+    }
+
+    private void Cancel()
+    {
+        DialogService.Close();
+    }
+
+    private async Task OnSubmit()
+    {
+        if (record == null)
+        {
+            return;
+        }
+
+        try
+        {
+
+            record.Product = productValues?.Select(x => new Product { Id = x }).ToList();
+            record.Service = serviceValues?.Select(x => new Service { Id = x }).ToList();            await AppService.UpdateVendorAsync(Id, record);
+            DialogService.Close();
+        }
+        catch (Exception ex)
+        {
+            NotificationMessage message = new()
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Update Failed",
+                Detail = ex.Message,
+                Duration = 4000
+            };
+
+            NotificationService.Notify(message);
+        }
+    }
+
+    private async Task<string?> UploadImageAsync(string dataUri)
+    {
+        const string jpegPrefix = "data:image/jpeg;base64,";
+        const string pngPrefix = "data:image/png;base64,";
+
+        string contentType;
+        byte[] buffer;
+
+        if (dataUri.StartsWith(jpegPrefix))
+        {
+            contentType = "image/jpeg";
+            buffer = Convert.FromBase64String(dataUri.Substring(jpegPrefix.Length));
+        }
+        else if (dataUri.StartsWith(pngPrefix))
+        {
+            contentType = "image/png";
+            buffer = Convert.FromBase64String(dataUri.Substring(pngPrefix.Length));
+        }
+        else
+        {
+            NotificationMessage message = new()
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Unsupported Image Type",
+                Detail = "Only JPEG and PNG images can be uploaded.",
+                Duration = 4000
+            };
+
+            NotificationService.Notify(message);
+            return null;
+        }
+
+        using MemoryStream stream = new(buffer);
+
+        try
+        {
+            return await AppService.UploadImageAsync(stream, buffer.Length, contentType);
+        }
+        catch (Exception ex)
+        {
+            NotificationMessage message = new()
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Image Upload Failed",
+                Detail = ex.Message,
+                Duration = 4000
+            };
+
+            NotificationService.Notify(message);
+        }
+
+        return null;
+    }
+}

@@ -1,0 +1,85 @@
+@inject AppService AppService
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+@attribute [Authorize]
+
+@if (user == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <RadzenColumn SizeMD=12>
+        <RadzenTemplateForm TItem="ModifyRolesModel" Data=@model Submit="OnSubmit">
+            <RadzenStack>
+                <RadzenDropDown @bind-Value=@model.Roles Data=@roles Multiple=true Placeholder="Select roles" Chips=true AllowSelectAll=false />
+            </RadzenStack>
+            <RadzenStack style="margin-top:1rem;" Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.End" Gap="0.5rem">
+                <RadzenButton ButtonStyle="ButtonStyle.Primary" ButtonType="ButtonType.Submit" Icon="save" Text="Save" Variant="Variant.Flat" />
+                <RadzenButton ButtonStyle="ButtonStyle.Light" Text="Cancel" Variant="Variant.Flat" Click="Cancel" />
+            </RadzenStack>
+        </RadzenTemplateForm>
+    </RadzenColumn>
+}
+
+@code {
+    [Parameter]
+    public string Id { get; set; } = null!;
+
+    private IEnumerable<string> roles = ["Administrator"];
+
+    private ModifyRolesModel model = new();
+    private ApplicationUserWithRolesDto? user;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            user = await AppService.GetUserByIdAsync(Id);
+            model.Roles = user?.Roles ?? [];
+        }
+        catch (Exception ex)
+        {
+            NotificationMessage message = new()
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Load Failed",
+                Detail = ex.Message,
+                Duration = 4000
+            };
+
+            NotificationService.Notify(message);
+        }
+    }
+
+    private void Cancel()
+    {
+        DialogService.Close();
+    }
+
+    private async Task OnSubmit()
+    {
+        try
+        {
+            await AppService.ModifyRolesAsync(Id, model.Roles);
+            DialogService.Close();
+        }
+        catch (Exception ex)
+        {
+            NotificationMessage message = new()
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Update Failed",
+                Detail = ex.Message,
+                Duration = 4000
+            };
+
+            NotificationService.Notify(message);
+        }
+    }
+
+    private class ModifyRolesModel
+    {
+        public IList<string> Roles { get; set; } = [];
+    }
+}

@@ -1,0 +1,188 @@
+@inject AppService AppService
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+@inject HttpClient HttpClient
+
+@if (record == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <style>
+        .rz-fileupload-content {
+            display: none;
+        }
+    </style>
+    <RadzenColumn SizeMD=12>
+        <RadzenTemplateForm TItem="Reward" Data="@record" Submit="OnSubmit">
+            <RadzenStack>
+                <RadzenFormField Text="Id" Variant="Variant.Filled">
+                    <ChildContent>
+                        <RadzenNumeric style="display:block;width:100%;" TValue="long?" Name="Id" @bind-Value="@record.Id" Disabled="true" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenFormField Text="Rewardpoints" Variant="Variant.Filled">
+                    <ChildContent>
+                        <RadzenNumeric style="display:block;width:100%;" TValue="long?" Name="Rewardpoints" @bind-Value="@record.Rewardpoints" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenFormField Text="CreditsDollars" Variant="Variant.Filled">
+                    <ChildContent>
+                        <RadzenNumeric style="display:block;width:100%;" TValue="decimal?" Name="CreditsDollars" @bind-Value="@record.CreditsDollars" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenFormField Text="ConversionRate" Variant="Variant.Filled">
+                    <ChildContent>
+                        <RadzenNumeric style="display:block;width:100%;" TValue="decimal?" Name="ConversionRate" @bind-Value="@record.ConversionRate" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenFormField Text="ExpirationDate" Variant="Variant.Filled">
+                    <ChildContent>
+                        <RadzenDatePicker ShowTime="true" ShowSeconds="true" style="display:block;width:100%;" TValue="DateTime?" Name="ExpirationDate" @bind-Value="@record.ExpirationDate" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenFormField Text="Notes" Variant="Variant.Filled">
+                    <ChildContent>
+                        <RadzenTextBox style="display:block;width:100%;" Name="Notes" @bind-Value="@record.Notes" />
+                    </ChildContent>
+                </RadzenFormField>
+            </RadzenStack>
+            <RadzenStack style="margin-top:1rem;" Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.End" Gap="0.5rem">
+                <RadzenButton ButtonStyle="ButtonStyle.Primary" ButtonType="ButtonType.Submit" Icon="save" Text="Save" Variant="Variant.Flat" />
+                <RadzenButton ButtonStyle="ButtonStyle.Light" Text="Cancel" Variant="Variant.Flat" Click="Cancel" />
+            </RadzenStack>
+        </RadzenTemplateForm>
+    </RadzenColumn>
+}
+
+@code {
+    [Parameter]
+    public long Id { get; set; }
+
+    private Reward? record;
+
+    private string GetAbsoluteUri(string uri)
+    {
+        if (!uri.StartsWith("/"))
+        {
+            return uri;
+        }
+
+        var baseUri = HttpClient.BaseAddress;
+
+        if (baseUri == null)
+        {
+            throw new Exception("Unable to determine base address");
+        }
+
+        Uri absolute = new(baseUri, uri);
+
+        return absolute.ToString();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            record = await AppService.GetRewardByIdAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            NotificationMessage message = new()
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Load Failed",
+                Detail = ex.Message,
+                Duration = 4000
+            };
+
+            NotificationService.Notify(message);
+        }
+    }
+
+    private void Cancel()
+    {
+        DialogService.Close();
+    }
+
+    private async Task OnSubmit()
+    {
+        if (record == null)
+        {
+            return;
+        }
+
+        try
+        {
+            await AppService.UpdateRewardAsync(Id, record);
+            DialogService.Close();
+        }
+        catch (Exception ex)
+        {
+            NotificationMessage message = new()
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Update Failed",
+                Detail = ex.Message,
+                Duration = 4000
+            };
+
+            NotificationService.Notify(message);
+        }
+    }
+
+    private async Task<string?> UploadImageAsync(string dataUri)
+    {
+        const string jpegPrefix = "data:image/jpeg;base64,";
+        const string pngPrefix = "data:image/png;base64,";
+
+        string contentType;
+        byte[] buffer;
+
+        if (dataUri.StartsWith(jpegPrefix))
+        {
+            contentType = "image/jpeg";
+            buffer = Convert.FromBase64String(dataUri.Substring(jpegPrefix.Length));
+        }
+        else if (dataUri.StartsWith(pngPrefix))
+        {
+            contentType = "image/png";
+            buffer = Convert.FromBase64String(dataUri.Substring(pngPrefix.Length));
+        }
+        else
+        {
+            NotificationMessage message = new()
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Unsupported Image Type",
+                Detail = "Only JPEG and PNG images can be uploaded.",
+                Duration = 4000
+            };
+
+            NotificationService.Notify(message);
+            return null;
+        }
+
+        using MemoryStream stream = new(buffer);
+
+        try
+        {
+            return await AppService.UploadImageAsync(stream, buffer.Length, contentType);
+        }
+        catch (Exception ex)
+        {
+            NotificationMessage message = new()
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Image Upload Failed",
+                Detail = ex.Message,
+                Duration = 4000
+            };
+
+            NotificationService.Notify(message);
+        }
+
+        return null;
+    }
+}
